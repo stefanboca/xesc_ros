@@ -47,6 +47,8 @@ private:
   double calibration_position_;   // unit: rad or m
   double zero_position_;          // unit: rad or m
   double Kp_, Ki_, Kd_;
+  double position_reference_previous_;
+  double position_previous_;
   double error_previous_;
   double error_integ_;
   ros::Time time_previous_;
@@ -54,6 +56,7 @@ private:
   bool calibrate(const double);
   bool isSaturated(const double) const;
   double saturate(const double) const;
+  double smoothDifferentiate(const double position_current, const double position_previous, const double dt) const;
 };
 
 }  // namespace vesc_hw_interface

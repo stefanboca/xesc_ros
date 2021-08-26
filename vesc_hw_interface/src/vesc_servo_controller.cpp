@@ -70,7 +70,9 @@ void VescServoController::control(const double position_reference, const double 
 
     // initializes/resets control variables
     time_previous_ = ros::Time::now();
-    error_previous_ = position_current;
+    position_previous_ = position_current;
+    position_reference_previous_ = position_current;
+    error_previous_ = 0.0;
     return;
   }
 
@@ -79,7 +81,9 @@ void VescServoController::control(const double position_reference, const double 
 
   // calculates PD control
   const double error_current = position_reference - position_current;
-  const double u_pd = Kp_ * error_current + Kd_ * (error_current - error_previous_) / dt;
+  const double u_p = Kp_ * error_current + Kd_;
+  const double u_pd = u_p + Kd_ * (smoothDifferentiate(position_current, position_previous_, dt) + (position_reference - position_reference_previous_) / dt);
+  // const double u_pd = Kp_ * error_current + Kd_ * (error_current - error_previous_) / dt;
 
   double u = 0.0;
 
@@ -109,6 +113,8 @@ void VescServoController::control(const double position_reference, const double 
   // updates previous data
   error_previous_ = error_current;
   time_previous_ = time_current;
+  position_previous_ = position_current;
+  position_reference_previous_ = position_reference;
 
   // command duty
   interface_ptr_->setDutyCycle(u);
@@ -198,4 +204,32 @@ double VescServoController::saturate(const double arg) const
   }
 }
 
+double VescServoController::smoothDifferentiate(const double position_current, const double position_previous, const double dt) const
+{
+  static double velocity_out = 0.0;
+  const double smoothing_timeout = 1.0;
+  const double smoothing_timeout_lpf = 0.99; // TODO: Calculate time constant
+  static double same_position_time = 0.0;
+  if(position_current == position_previous)
+  {
+    if(same_position_time < smoothing_timeout)
+    {
+      same_position_time += dt; // Output is same as previous value
+    }
+    else
+    {
+      velocity_out *= smoothing_timeout_lpf;
+    }
+  }
+  else
+  {
+    velocity_out = (position_current - position_previous) / (dt + same_position_time);
+    same_position_time = 0.0;
+    if(same_position_time > smoothing_timeout)
+    {
+      velocity_out *= smoothing_timeout_lpf;
+    }
+  }
+  return velocity_out;
+}
 }  // namespace vesc_hw_interface
