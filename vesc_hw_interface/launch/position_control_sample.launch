@@ -8,12 +8,19 @@
     <rosparam>
       joint_name: arm_joint
       command_mode: position
-      port: /dev/ttyUSB0
+      port: /dev/ttyACM0
       num_motor_pole_pairs: 10
-      gear_ratio: 1
+      gear_ratio: 0.1
       torque_const: 1
+      servo/calibration_mode: duty
+      servo/calibration_duty: 0.00
       servo/calibration_current: 1.0
-      servo/calibration_position: 0.01
+      servo/calibration_position: -0.1
+      servo/Kp: 1.0
+      servo/Ki: 3.0
+      servo/Kd: 0.1
+      servo/control_rate: 50.0
+      servo/speed_limit: 1.0
     </rosparam>
   </node>
 
