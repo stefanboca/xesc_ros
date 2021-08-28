@@ -168,6 +168,10 @@ double VescServoController::getZeroPosition() const
 
 double VescServoController::getPositionSens(void)
 {
+  if (calibration_flag_)
+  {
+    return calibration_position_;
+  }
   return position_sens_;
 }
 
