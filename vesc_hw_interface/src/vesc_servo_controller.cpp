@@ -87,8 +87,6 @@ void VescServoController::control(const double position_reference, const double 
     time_previous_ = ros::Time::now();
     position_sens_previous_ = position_current;
     error_previous_ = 0.0;
-    position_sens_previous_ = position_current;
-    position_reference_previous_ = position_reference;
     return;
   }
 
@@ -285,6 +283,7 @@ void VescServoController::updateSpeedLimitedPositionReference(void)
 void VescServoController::controlTimerCallback(const ros::TimerEvent& e)
 {
   updateSpeedLimitedPositionReference();
+  ROS_INFO("[VescServoController]Target %f, Ref %f, Sens %f", position_target_, position_reference_, position_sens_);
   // position_reference_ = position_target_;
   control(position_reference_, position_sens_);
   interface_ptr_->requestState();
