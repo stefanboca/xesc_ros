@@ -33,26 +33,36 @@
  * Corp. takes over development as new packages.
  ********************************************************************/
 
-#include <ros/ros.h>
-
+#include "rclcpp/rclcpp.hpp"
 #include "vesc_driver/vesc_driver.h"
 
-int main(int argc, char **argv) {
-    ros::init(argc, argv, "vesc_driver_node");
-    ros::NodeHandle nh;
-    ros::NodeHandle private_nh("~");
+#include <memory.h>
 
-    vesc_driver::VescDriver vesc_driver(nh, private_nh);
-    ROS_INFO_STREAM("started VESC driver");
+int main(int argc, char** argv) {
+    // ros::init(argc, argv, "vesc_driver_node");
+    // ros::NodeHandle nh;
+    // ros::NodeHandle private_nh("~");
 
-    ros::AsyncSpinner spinner(1);
-    spinner.start();
-    while (ros::ok()) {
-        vesc_driver.waitForStateAndPublish();
-    }
-    ROS_INFO_STREAM("stopping VESC driver");
-    vesc_driver.stop();
-    spinner.stop();
+    // vesc_driver::VescDriver vesc_driver(nh, private_nh);
+    // ROS_INFO_STREAM("started VESC driver");
+
+    // ros::AsyncSpinner spinner(1);
+    // spinner.start();
+    // while (ros::ok()) { vesc_driver.waitForStateAndPublish(); }
+    // ROS_INFO_STREAM("stopping VESC driver");
+    // vesc_driver.stop();
+    // spinner.stop();
+
+    rclcpp::init(argc, argv);
+    vesc_driver::VescDriver::SharedPtr vesc_driver = std::make_shared<vesc_driver::VescDriver>(rclcpp::NodeOptions());
+
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(vesc_driver);
+    executor.spin();
+
+    // TODO call waitForStateAndPublish
+
+    rclcpp::shutdown();
 
     return 0;
 }

@@ -36,72 +36,71 @@
 #ifndef VESC_DRIVER_VESC_DRIVER_H_
 #define VESC_DRIVER_VESC_DRIVER_H_
 
-#include <cassert>
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/float64.hpp"
+#include "vesc_driver/vesc_interface.h"
+#include "vesc_driver/vesc_packet.h"
+#include "vesc_driver/visibility.h"
+#include "vesc_msgs/msg/vesc_state_stamped.hpp"
+
+// #include <cassert>
+
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 
-#include <boost/optional.hpp>
-
-#include <ros/ros.h>
-#include <std_msgs/Float64.h>
-#include <vesc_msgs/VescStateStamped.h>
-
-#include "vesc_driver/vesc_interface.h"
-#include "vesc_driver/vesc_packet.h"
-
-namespace vesc_driver
-{
-class VescDriver
-{
+namespace vesc_driver {
+class VescDriver : public rclcpp::Node {
 public:
-  VescDriver(ros::NodeHandle &nh, ros::NodeHandle &private_nh);
+    VESC_DRIVER_PUBLIC VescDriver(rclcpp::NodeOptions options);
+    VESC_DRIVER_PUBLIC ~VescDriver();
 
     void waitForStateAndPublish();
-    void stop();
+
 private:
-  // interface to the VESC
-  VescInterface vesc_;
-  void vescErrorCallback(const std::string& error);
+    // interface to the VESC
+    VescInterface vesc_;
+    void vescErrorCallback(const std::string& error);
 
-  // limits on VESC commands
-  struct CommandLimit
-  {
-    CommandLimit(const ros::NodeHandle& nh, const std::string& str,
-                 const boost::optional<double>& min_lower = boost::optional<double>(),
-                 const boost::optional<double>& max_upper = boost::optional<double>());
-    double clip(double value);
-    std::string name;
-    boost::optional<double> lower;
-    boost::optional<double> upper;
-  };
-  CommandLimit duty_cycle_limit_;
-  CommandLimit current_limit_;
-  CommandLimit brake_limit_;
-  CommandLimit speed_limit_;
-  CommandLimit position_limit_;
+    // limits on VESC commands
+    struct CommandLimit {
+        CommandLimit(const rclcpp::Node::SharedPtr node,
+                     const std::string& str,
+                     const std::optional<double>& min_lower = std::optional<double>(),
+                     const std::optional<double>& max_upper = std::optional<double>());
+        double clip(double value);
+        rclcpp::Node::SharedPtr node;
+        std::string name;
+        std::optional<double> lower;
+        std::optional<double> upper;
+    };
+    CommandLimit duty_cycle_limit_;
+    CommandLimit current_limit_;
+    CommandLimit brake_limit_;
+    CommandLimit speed_limit_;
+    CommandLimit position_limit_;
 
-  // ROS services
-  ros::Publisher state_pub_;
-  ros::Subscriber duty_cycle_sub_;
-  ros::Subscriber current_sub_;
-  ros::Subscriber brake_sub_;
-  ros::Subscriber speed_sub_;
-  ros::Subscriber position_sub_;
+    // ROS services
+    rclcpp::Publisher<vesc_msgs::msg::VescStateStamped>::SharedPtr state_pub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr duty_cycle_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr current_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr brake_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr speed_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr position_sub_;
 
+    VescStatusStruct vesc_status = {};
 
-  VescStatusStruct vesc_status = {0};
-
-  // ROS callbacks
-  void dutyCycleCallback(const std_msgs::Float64::ConstPtr& duty_cycle);
-  void currentCallback(const std_msgs::Float64::ConstPtr& current);
-  void brakeCallback(const std_msgs::Float64::ConstPtr& brake);
-  void speedCallback(const std_msgs::Float64::ConstPtr& speed);
-  void positionCallback(const std_msgs::Float64::ConstPtr& position);
+    // ROS callbacks
+    void dutyCycleCallback(const std_msgs::msg::Float64::SharedPtr duty_cycle);
+    void currentCallback(const std_msgs::msg::Float64::SharedPtr current);
+    void brakeCallback(const std_msgs::msg::Float64::SharedPtr brake);
+    void speedCallback(const std_msgs::msg::Float64::SharedPtr speed);
+    void positionCallback(const std_msgs::msg::Float64::SharedPtr position);
 };
 
-}  // namespace vesc_driver
+} // namespace vesc_driver
 
-#endif  // VESC_DRIVER_VESC_DRIVER_H_
+#endif // VESC_DRIVER_VESC_DRIVER_H_

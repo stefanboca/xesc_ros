@@ -1,83 +1,77 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.8)
 project(vesc_driver)
 
-add_compile_options(-std=c++11)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-find_package(catkin REQUIRED COMPONENTS
-  nodelet
-  pluginlib
-  roscpp
-  std_msgs
-  vesc_msgs
-  serial
-)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(vesc_msgs REQUIRED)
+find_package(serial REQUIRED)
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES vesc_driver
-  CATKIN_DEPENDS nodelet pluginlib roscpp std_msgs vesc_msgs serial
-)
+include_directories(include)
 
-###########
-## Build ##
-###########
-
-include_directories(
-  include
-  ${Boost_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
-)
-
-# driver libraries
-add_library(vesc_driver
+add_library(
+  vesc_driver SHARED
   src/vesc_driver.cpp
   src/vesc_interface.cpp
   src/vesc_packet.cpp
   src/vesc_packet_factory.cpp
 )
+ament_target_dependencies(vesc_driver rclcpp rclcpp_components std_msgs vesc_msgs serial)
 
-add_dependencies(vesc_driver ${catkin_EXPORTED_TARGETS})
+if(NOT WIN32)
+  ament_environment_hooks("${ament_cmake_package_templates_ENVIRONMENT_HOOK_LIBRARY_PATH}")
+endif()
 
-# node executable
 add_executable(vesc_driver_node src/vesc_driver_node.cpp)
-add_dependencies(vesc_driver_node ${catkin_EXPORTED_TARGETS})
-target_link_libraries(vesc_driver_node
+target_link_libraries(vesc_driver_node vesc_driver)
+ament_target_dependencies(vesc_driver_node rclcpp)
+
+install(
+  TARGETS
   vesc_driver
-  ${catkin_LIBRARIES}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-# nodelet library
-add_library(vesc_driver_nodelet src/vesc_driver_nodelet.cpp)
-add_dependencies(vesc_driver_nodelet ${catkin_EXPORTED_TARGETS})
-target_link_libraries(vesc_driver_nodelet
-  vesc_driver
-  ${catkin_LIBRARIES}
+install(
+  TARGETS
+  vesc_driver_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-#############
-## Install ##
-#############
 
-install(TARGETS vesc_driver
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-)
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  # comment the line when a copyright and license is added to all source files
+  set(ament_cmake_copyright_FOUND TRUE)
+  # the following line skips cpplint (only works in a git repo)
+  # comment the line when this package is in a git repo and when
+  # a copyright and license is added to all source files
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
-install(TARGETS vesc_driver_node
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+ament_package()
 
-install(TARGETS vesc_driver_nodelet
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-)
+# # node executable
+# add_executable(vesc_driver_node src/vesc_driver_node.cpp)
+# add_dependencies(vesc_driver_node ${catkin_EXPORTED_TARGETS})
+# target_link_libraries(vesc_driver_node
+#   vesc_driver
+#   ${catkin_LIBRARIES}
+# )
 
-install(DIRECTORY include/${PROJECT_NAME}
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-)
-
-install(FILES vesc_driver_nodelet.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-install(DIRECTORY launch
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-)
+# # nodelet library
+# add_library(vesc_driver_nodelet src/vesc_driver_nodelet.cpp)
+# add_dependencies(vesc_driver_nodelet ${catkin_EXPORTED_TARGETS})
+# target_link_libraries(vesc_driver_nodelet
+#   vesc_driver
+#   ${catkin_LIBRARIES}
+# )
