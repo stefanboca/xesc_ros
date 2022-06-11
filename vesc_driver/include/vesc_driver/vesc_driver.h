@@ -52,6 +52,8 @@
 #include <sstream>
 #include <string>
 
+using namespace std::chrono_literals;
+
 namespace vesc_driver {
 class VescDriver : public rclcpp::Node {
 public:
@@ -79,13 +81,14 @@ private:
     CommandLimit speed_limit_;
     CommandLimit position_limit_;
 
-    // ROS services
+    // ROS topics
     rclcpp::Publisher<vesc_msgs::msg::VescStateStamped>::SharedPtr state_pub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr duty_cycle_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr current_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr brake_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr speed_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr position_sub_;
+    rclcpp::TimerBase::SharedPtr state_publish_timer_;
 
     VescStatusStruct vesc_status = {};
 
@@ -95,6 +98,7 @@ private:
     void brakeCallback(const std_msgs::msg::Float64::SharedPtr brake);
     void speedCallback(const std_msgs::msg::Float64::SharedPtr speed);
     void positionCallback(const std_msgs::msg::Float64::SharedPtr position);
+    void statePublishCallback();
 
 protected:
     CommandLimit createCommandLimit(const std::string& name,

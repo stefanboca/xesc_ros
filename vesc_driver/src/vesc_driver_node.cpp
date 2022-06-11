@@ -55,13 +55,7 @@ int main(int argc, char** argv) {
 
     rclcpp::init(argc, argv);
     vesc_driver::VescDriver::SharedPtr vesc_driver = std::make_shared<vesc_driver::VescDriver>(rclcpp::NodeOptions());
-
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(vesc_driver);
-    executor.spin();
-
-    // TODO call waitForStateAndPublish
-
+    rclcpp::spin(vesc_driver);
     rclcpp::shutdown();
 
     return 0;

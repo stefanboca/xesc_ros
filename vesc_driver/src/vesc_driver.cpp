@@ -76,6 +76,8 @@ VescDriver::VescDriver(rclcpp::NodeOptions options)
         "commands/motor/speed", 10, std::bind(&VescDriver::speedCallback, this, _1));
     position_sub_ = this->create_subscription<std_msgs::msg::Float64>(
         "commands/motor/position", 10, std::bind(&VescDriver::positionCallback, this, _1));
+
+    state_publish_timer_ = this->create_wall_timer(500ms, std::bind(&VescDriver::statePublishCallback, this));
 }
 
 VescDriver::~VescDriver() { vesc_.stop(); }
@@ -127,8 +129,8 @@ void VescDriver::positionCallback(const std_msgs::msg::Float64::SharedPtr positi
     vesc_.setPosition(position_deg);
 }
 
-void VescDriver::waitForStateAndPublish() {
-    vesc_.wait_for_status(&vesc_status);
+void VescDriver::statePublishCallback() {
+    vesc_.get_status(&vesc_status);
 
     auto state_msg = vesc_msgs::msg::VescStateStamped();
     state_msg.header.stamp = this->now();

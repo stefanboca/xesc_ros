@@ -35,6 +35,8 @@
 
 #include "vesc_driver/vesc_interface.h"
 
+#include "vesc_msgs/msg/vesc_state.hpp"
+
 namespace vesc_driver {
 
 VescInterface::VescInterface(const ErrorHandlerFunction& error_handler, uint32_t state_request_millis)
@@ -59,19 +61,20 @@ void* VescInterface::update_thread() {
         nanosleep(&time, nullptr);
 
         std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-        VESC_CONNECTION_STATE state;
+        uint8_t state;
         {
             std::unique_lock<std::mutex> lk(status_mutex_);
             state = status_.connection_state;
         }
 
-        if (WAITING_FOR_FW == state) {
+        if (vesc_msgs::msg::VescState::CONNECTION_STATE_WAITING_FOR_FW == state) {
             if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_fw_request).count() > 1000) {
                 last_fw_request = now;
                 requestFWVersion();
             }
             continue;
-        } else if (status_.connection_state == CONNECTED || status_.connection_state == CONNECTED_INCOMPATIBLE_FW) {
+        } else if (status_.connection_state == vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED ||
+                   status_.connection_state == vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED_INCOMPATIBLE_FW) {
             requestState();
         }
     }
@@ -85,7 +88,7 @@ void* VescInterface::rx_thread() {
     {
         std::unique_lock<std::mutex> lk(status_mutex_);
         status_ = {};
-        status_.connection_state = DISCONNECTED;
+        status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_DISCONNECTED;
     }
     while (rx_thread_run_) {
         // Check, if the serial port is connected. If not, connect to it.
@@ -93,7 +96,7 @@ void* VescInterface::rx_thread() {
             {
                 std::unique_lock<std::mutex> lk(status_mutex_);
                 status_ = {};
-                status_.connection_state = DISCONNECTED;
+                status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_DISCONNECTED;
             }
             try {
                 serial_.setPort(port_);
@@ -105,7 +108,7 @@ void* VescInterface::rx_thread() {
             }
             {
                 std::unique_lock<std::mutex> lk(status_mutex_);
-                status_.connection_state = VESC_CONNECTION_STATE::WAITING_FOR_FW;
+                status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_WAITING_FOR_FW;
             }
         }
 
@@ -172,7 +175,7 @@ void* VescInterface::rx_thread() {
             error_handler_("error during serial read. reconnecting.");
             {
                 std::unique_lock<std::mutex> lk(status_mutex_);
-                status_.connection_state = VESC_CONNECTION_STATE::DISCONNECTED;
+                status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_DISCONNECTED;
             }
             serial_.close();
         }
@@ -185,7 +188,8 @@ void* VescInterface::rx_thread() {
 
 void VescInterface::handle_packet(VescPacketConstPtr packet) {
     // Only update the state if connection state is connected
-    if ((status_.connection_state == CONNECTED || status_.connection_state == CONNECTED_INCOMPATIBLE_FW) &&
+    if ((status_.connection_state == vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED ||
+         status_.connection_state == vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED_INCOMPATIBLE_FW) &&
         packet->getName() == "Values") {
         std::lock_guard<std::mutex> lk(status_mutex_);
         std::shared_ptr<VescPacketValues const> values = std::dynamic_pointer_cast<VescPacketValues const>(packet);
@@ -218,9 +222,9 @@ void VescInterface::handle_packet(VescPacketConstPtr packet) {
 
         // check for fully compatible FW here
         if (status_.fw_version_major == 5 && status_.fw_version_minor == 3) {
-            status_.connection_state = CONNECTED;
+            status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED;
         } else {
-            status_.connection_state = CONNECTED_INCOMPATIBLE_FW;
+            status_.connection_state = vesc_msgs::msg::VescState::CONNECTION_STATE_CONNECTED_INCOMPATIBLE_FW;
         }
 
         status_cv_.notify_all();
