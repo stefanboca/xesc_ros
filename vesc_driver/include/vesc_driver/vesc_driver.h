@@ -58,9 +58,8 @@ namespace vesc_driver {
 class VescDriver : public rclcpp::Node {
 public:
     VESC_DRIVER_PUBLIC VescDriver(rclcpp::NodeOptions options);
-    VESC_DRIVER_PUBLIC ~VescDriver();
 
-    void waitForStateAndPublish();
+    VESC_DRIVER_PUBLIC void stop();
 
 private:
     // interface to the VESC

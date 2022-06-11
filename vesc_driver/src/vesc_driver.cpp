@@ -45,7 +45,7 @@ VescDriver::VescDriver(rclcpp::NodeOptions options)
       vesc_(std::bind(&VescDriver::vescErrorCallback, this, std::placeholders::_1)) {
     this->declare_parameter("port", rclcpp::PARAMETER_STRING);
 
-    // TODO handle parameter changes during runtime
+    // TODO: handle parameter changes during runtime
     duty_cycle_limit_ = createCommandLimit("duty_cycle", -1.0, 1.0);
     current_limit_ = createCommandLimit("current");
     brake_limit_ = createCommandLimit("brake");
@@ -80,7 +80,7 @@ VescDriver::VescDriver(rclcpp::NodeOptions options)
     state_publish_timer_ = this->create_wall_timer(500ms, std::bind(&VescDriver::statePublishCallback, this));
 }
 
-VescDriver::~VescDriver() { vesc_.stop(); }
+void VescDriver::stop() { vesc_.stop(); }
 
 void VescDriver::vescErrorCallback(const std::string& error) { RCLCPP_ERROR(this->get_logger(), "%s", error.c_str()); }
 
