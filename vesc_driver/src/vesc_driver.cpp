@@ -43,7 +43,6 @@ namespace vesc_driver {
 VescDriver::VescDriver(rclcpp::NodeOptions options)
     : Node("vesc_driver", options),
       vesc_(std::bind(&VescDriver::vescErrorCallback, this, std::placeholders::_1)) {
-    RCLCPP_DEBUG(this->get_logger(), "Driver constructor start");
     this->declare_parameter("port", rclcpp::PARAMETER_STRING);
 
     // TODO handle parameter changes during runtime
@@ -156,7 +155,6 @@ void VescDriver::waitForStateAndPublish() {
 VescDriver::CommandLimit VescDriver::createCommandLimit(const std::string& name,
                                                         const std::optional<double>& min_lower,
                                                         const std::optional<double>& max_upper) {
-    RCLCPP_DEBUG(rclcpp::get_logger("commandlimit"), "CommandLimit builder called");
     this->declare_parameter(name + "_min", rclcpp::PARAMETER_DOUBLE);
     this->declare_parameter(name + "_max", rclcpp::PARAMETER_DOUBLE);
 
