@@ -67,15 +67,11 @@ private:
 
     // limits on VESC commands
     struct CommandLimit {
-        CommandLimit(const rclcpp::Node::SharedPtr node,
-                     const std::string& str,
-                     const std::optional<double>& min_lower = std::optional<double>(),
-                     const std::optional<double>& max_upper = std::optional<double>());
-        double clip(double value);
-        rclcpp::Node::SharedPtr node;
         std::string name;
         std::optional<double> lower;
         std::optional<double> upper;
+
+        double clip(double value);
     };
     CommandLimit duty_cycle_limit_;
     CommandLimit current_limit_;
@@ -99,6 +95,11 @@ private:
     void brakeCallback(const std_msgs::msg::Float64::SharedPtr brake);
     void speedCallback(const std_msgs::msg::Float64::SharedPtr speed);
     void positionCallback(const std_msgs::msg::Float64::SharedPtr position);
+
+protected:
+    CommandLimit createCommandLimit(const std::string& name,
+                                    const std::optional<double>& min_lower = std::optional<double>(),
+                                    const std::optional<double>& max_upper = std::optional<double>());
 };
 
 } // namespace vesc_driver

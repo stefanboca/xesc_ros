@@ -54,7 +54,9 @@ int main(int argc, char** argv) {
     // spinner.stop();
 
     rclcpp::init(argc, argv);
+    RCLCPP_DEBUG_STREAM(rclcpp::get_logger("before_node"), "Initialized");
     vesc_driver::VescDriver::SharedPtr vesc_driver = std::make_shared<vesc_driver::VescDriver>(rclcpp::NodeOptions());
+    RCLCPP_DEBUG_STREAM(vesc_driver->get_logger(), "Starting");
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(vesc_driver);

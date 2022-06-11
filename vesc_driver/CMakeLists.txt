@@ -22,6 +22,7 @@ add_library(
   src/vesc_packet_factory.cpp
 )
 ament_target_dependencies(vesc_driver rclcpp rclcpp_components std_msgs vesc_msgs serial)
+rclcpp_components_register_nodes(vesc_driver "vesc_driver:VescDriver")
 
 if(NOT WIN32)
   ament_environment_hooks("${ament_cmake_package_templates_ENVIRONMENT_HOOK_LIBRARY_PATH}")
@@ -45,6 +46,12 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -59,19 +66,3 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
-
-# # node executable
-# add_executable(vesc_driver_node src/vesc_driver_node.cpp)
-# add_dependencies(vesc_driver_node ${catkin_EXPORTED_TARGETS})
-# target_link_libraries(vesc_driver_node
-#   vesc_driver
-#   ${catkin_LIBRARIES}
-# )
-
-# # nodelet library
-# add_library(vesc_driver_nodelet src/vesc_driver_nodelet.cpp)
-# add_dependencies(vesc_driver_nodelet ${catkin_EXPORTED_TARGETS})
-# target_link_libraries(vesc_driver_nodelet
-#   vesc_driver
-#   ${catkin_LIBRARIES}
-# )

@@ -42,12 +42,17 @@ using std::placeholders::_1;
 namespace vesc_driver {
 VescDriver::VescDriver(rclcpp::NodeOptions options)
     : Node("vesc_driver", options),
-      vesc_(std::bind(&VescDriver::vescErrorCallback, this, std::placeholders::_1)),
-      duty_cycle_limit_(shared_from_this(), "duty_cycle", -1.0, 1.0),
-      current_limit_(shared_from_this(), "current"),
-      brake_limit_(shared_from_this(), "brake"),
-      speed_limit_(shared_from_this(), "speed"),
-      position_limit_(shared_from_this(), "position") {
+      vesc_(std::bind(&VescDriver::vescErrorCallback, this, std::placeholders::_1)) {
+    RCLCPP_DEBUG(this->get_logger(), "Driver constructor start");
+    this->declare_parameter("port", rclcpp::PARAMETER_STRING);
+
+    // TODO handle parameter changes during runtime
+    duty_cycle_limit_ = createCommandLimit("duty_cycle", -1.0, 1.0);
+    current_limit_ = createCommandLimit("current");
+    brake_limit_ = createCommandLimit("brake");
+    speed_limit_ = createCommandLimit("speed");
+    position_limit_ = createCommandLimit("position");
+
     // get vesc serial port address
     std::string port;
     if (!this->get_parameter("port", port)) {
@@ -148,95 +153,101 @@ void VescDriver::waitForStateAndPublish() {
     state_pub_->publish(state_msg);
 }
 
-VescDriver::CommandLimit::CommandLimit(const rclcpp::Node::SharedPtr node,
-                                       const std::string& str,
-                                       const std::optional<double>& min_lower,
-                                       const std::optional<double>& max_upper)
-    : node(node),
-      name(str) {
+VescDriver::CommandLimit VescDriver::createCommandLimit(const std::string& name,
+                                                        const std::optional<double>& min_lower,
+                                                        const std::optional<double>& max_upper) {
+    RCLCPP_DEBUG(rclcpp::get_logger("commandlimit"), "CommandLimit builder called");
+    this->declare_parameter(name + "_min", rclcpp::PARAMETER_DOUBLE);
+    this->declare_parameter(name + "_max", rclcpp::PARAMETER_DOUBLE);
+
+    CommandLimit commandLimit;
+    commandLimit.name = name;
+
     // check if user's minimum value is outside of the range min_lower to max_upper
     double param_min;
-    if (node->get_parameter(name + "_min", param_min)) {
+    if (this->get_parameter(name + "_min", param_min)) {
         if (min_lower && param_min < *min_lower) {
-            lower = *min_lower;
-            RCLCPP_WARN_STREAM(node->get_logger(),
+            commandLimit.lower = *min_lower;
+            RCLCPP_WARN_STREAM(this->get_logger(),
                                "Parameter " << name << "_min (" << param_min << ") is less than the feasible minimum ("
                                             << *min_lower << ").");
         } else if (max_upper && param_min > *max_upper) {
-            lower = *max_upper;
-            RCLCPP_WARN_STREAM(node->get_logger(),
+            commandLimit.lower = *max_upper;
+            RCLCPP_WARN_STREAM(this->get_logger(),
                                "Parameter " << name << "_min (" << param_min
                                             << ") is greater than the feasible maximum (" << *max_upper << ").");
         } else {
-            lower = param_min;
+            commandLimit.lower = param_min;
         }
     } else if (min_lower) {
-        lower = *min_lower;
+        commandLimit.lower = *min_lower;
     }
 
     // check if the uers' maximum value is outside of the range min_lower to max_upper
     double param_max;
-    if (node->get_parameter(name + "_max", param_max)) {
+    if (this->get_parameter(name + "_max", param_max)) {
         if (min_lower && param_max < *min_lower) {
-            upper = *min_lower;
-            RCLCPP_WARN_STREAM(node->get_logger(),
+            commandLimit.upper = *min_lower;
+            RCLCPP_WARN_STREAM(this->get_logger(),
                                "Parameter " << name << "_max (" << param_max << ") is less than the feasible minimum ("
                                             << *min_lower << ").");
         } else if (max_upper && param_max > *max_upper) {
-            upper = *max_upper;
-            RCLCPP_WARN_STREAM(node->get_logger(),
+            commandLimit.upper = *max_upper;
+            RCLCPP_WARN_STREAM(this->get_logger(),
                                "Parameter " << name << "_max (" << param_max
                                             << ") is greater than the feasible maximum (" << *max_upper << ").");
         } else {
-            upper = param_max;
+            commandLimit.upper = param_max;
         }
     } else if (max_upper) {
-        upper = *max_upper;
+        commandLimit.upper = *max_upper;
     }
 
     // check for min > max
-    if (upper && lower && *lower > *upper) {
-        RCLCPP_WARN_STREAM(node->get_logger(),
-                           "Parameter " << name << "_max (" << *upper << ") is less than parameter " << name << "_min ("
-                                        << *lower << ").");
-        double temp(*lower);
-        lower = *upper;
-        upper = temp;
+    if (commandLimit.upper && commandLimit.lower && *commandLimit.lower > *commandLimit.upper) {
+        RCLCPP_WARN_STREAM(this->get_logger(),
+                           "Parameter " << name << "_max (" << *commandLimit.upper << ") is less than parameter "
+                                        << name << "_min (" << *commandLimit.lower << ").");
+        double temp(*commandLimit.lower);
+        commandLimit.lower = *commandLimit.upper;
+        commandLimit.upper = temp;
     }
 
     std::ostringstream oss;
     oss << "  " << name << " limit: ";
-    if (lower)
-        oss << *lower << " ";
+    if (commandLimit.lower)
+        oss << *commandLimit.lower << " ";
     else
         oss << "(none) ";
-    if (upper)
-        oss << *upper;
+    if (commandLimit.upper)
+        oss << *commandLimit.upper;
     else
         oss << "(none)";
-    RCLCPP_DEBUG_STREAM(node->get_logger(), oss.str());
+    RCLCPP_DEBUG_STREAM(this->get_logger(), oss.str());
+
+    return commandLimit;
 }
 
 double VescDriver::CommandLimit::clip(double value) {
-    auto& clk = *node->get_clock();
+    // auto& clk = *node->get_clock();
     if (lower && value < lower) {
-        RCLCPP_INFO_THROTTLE(node->get_logger(),
-                             clk,
-                             10000,
-                             "%s command value (%f) below minimum limit (%f), clipping.",
-                             name.c_str(),
-                             value,
-                             *lower);
+        // RCLCPP_INFO_THROTTLE(node->get_logger(),
+        //                      clk,
+        //                      10000,
+        //                      "%s command value (%f) below minimum limit (%f), clipping.",
+        //                      name.c_str(),
+        //                      value,
+        //                      *lower);
         return *lower;
     }
     if (upper && value > upper) {
-        RCLCPP_INFO_THROTTLE(node->get_logger(),
-                             clk,
-                             10000,
-                             "%s command value (%f) above maximum limit (%f), clipping.",
-                             name.c_str(),
-                             value,
-                             *upper);
+        // RCLCPP_INFO_THROTTLE(node->get_logger(),
+        //                      clk,
+        //                      10000,
+        //                      "%s command value (%f) above maximum limit (%f), clipping.",
+        //                      name.c_str(),
+        //                      value,
+        //                      *upper);
         return *upper;
     }
     return value;
