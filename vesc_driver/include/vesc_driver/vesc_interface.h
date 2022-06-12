@@ -114,7 +114,7 @@ public:
     void stop();
 
     void get_status(VescStatusStruct* status);
-    void wait_for_status(VescStatusStruct* status);
+    bool wait_for_status(VescStatusStruct* status);
     void requestFWVersion();
     void requestState();
 

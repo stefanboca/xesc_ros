@@ -63,24 +63,31 @@ VescDriver::VescDriver(rclcpp::NodeOptions options)
     vesc_.start(port);
 
     // create vesc state (telemetry) publisher
-    state_pub_ = this->create_publisher<vesc_msgs::msg::VescStateStamped>("sensors/core", 10);
+    state_pub_ = this->create_publisher<vesc_msgs::msg::VescStateStamped>("~/sensors/core", 10);
 
     // subscribe to motor and servo command topics
     duty_cycle_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "commands/motor/duty_cycle", 10, std::bind(&VescDriver::dutyCycleCallback, this, _1));
+        "~/commands/motor/duty_cycle", 10, std::bind(&VescDriver::dutyCycleCallback, this, _1));
     current_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "commands/motor/current", 10, std::bind(&VescDriver::currentCallback, this, _1));
+        "~/commands/motor/current", 10, std::bind(&VescDriver::currentCallback, this, _1));
     brake_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "commands/motor/brake", 10, std::bind(&VescDriver::brakeCallback, this, _1));
+        "~/commands/motor/brake", 10, std::bind(&VescDriver::brakeCallback, this, _1));
     speed_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "commands/motor/speed", 10, std::bind(&VescDriver::speedCallback, this, _1));
+        "~/commands/motor/speed", 10, std::bind(&VescDriver::speedCallback, this, _1));
     position_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "commands/motor/position", 10, std::bind(&VescDriver::positionCallback, this, _1));
+        "~/commands/motor/position", 10, std::bind(&VescDriver::positionCallback, this, _1));
 
-    state_publish_timer_ = this->create_wall_timer(500ms, std::bind(&VescDriver::statePublishCallback, this));
+    publish_thread_ = std::thread(&VescDriver::publishThread, this);
+    running = true;
 }
 
-void VescDriver::stop() { vesc_.stop(); }
+VescDriver::~VescDriver() { stop(); }
+
+void VescDriver::stop() {
+    running = false;
+    if (publish_thread_.joinable()) publish_thread_.join();
+    vesc_.stop();
+}
 
 void VescDriver::vescErrorCallback(const std::string& error) { RCLCPP_ERROR(this->get_logger(), "%s", error.c_str()); }
 
@@ -129,29 +136,31 @@ void VescDriver::positionCallback(const std_msgs::msg::Float64::SharedPtr positi
     vesc_.setPosition(position_deg);
 }
 
-void VescDriver::statePublishCallback() {
-    vesc_.get_status(&vesc_status);
+void VescDriver::publishThread() {
+    while (running) {
+        if (vesc_.wait_for_status(&vesc_status) && rclcpp::ok()) {
+            auto state_msg = vesc_msgs::msg::VescStateStamped();
+            state_msg.header.stamp = this->now();
+            state_msg.state.connection_state = vesc_status.connection_state;
+            state_msg.state.fw_major = vesc_status.fw_version_major;
+            state_msg.state.fw_minor = vesc_status.fw_version_minor;
+            state_msg.state.voltage_input = vesc_status.voltage_input;
+            state_msg.state.temperature_pcb = vesc_status.temperature_pcb;
+            state_msg.state.current_motor = vesc_status.current_motor;
+            state_msg.state.current_input = vesc_status.current_input;
+            state_msg.state.speed = vesc_status.speed_erpm;
+            state_msg.state.duty_cycle = vesc_status.duty_cycle;
+            state_msg.state.charge_drawn = vesc_status.charge_drawn;
+            state_msg.state.charge_regen = vesc_status.charge_regen;
+            state_msg.state.energy_drawn = vesc_status.energy_drawn;
+            state_msg.state.energy_regen = vesc_status.energy_regen;
+            state_msg.state.displacement = vesc_status.displacement;
+            state_msg.state.distance_traveled = vesc_status.distance_traveled;
+            state_msg.state.fault_code = vesc_status.fault_code;
 
-    auto state_msg = vesc_msgs::msg::VescStateStamped();
-    state_msg.header.stamp = this->now();
-    state_msg.state.connection_state = vesc_status.connection_state;
-    state_msg.state.fw_major = vesc_status.fw_version_major;
-    state_msg.state.fw_minor = vesc_status.fw_version_minor;
-    state_msg.state.voltage_input = vesc_status.voltage_input;
-    state_msg.state.temperature_pcb = vesc_status.temperature_pcb;
-    state_msg.state.current_motor = vesc_status.current_motor;
-    state_msg.state.current_input = vesc_status.current_input;
-    state_msg.state.speed = vesc_status.speed_erpm;
-    state_msg.state.duty_cycle = vesc_status.duty_cycle;
-    state_msg.state.charge_drawn = vesc_status.charge_drawn;
-    state_msg.state.charge_regen = vesc_status.charge_regen;
-    state_msg.state.energy_drawn = vesc_status.energy_drawn;
-    state_msg.state.energy_regen = vesc_status.energy_regen;
-    state_msg.state.displacement = vesc_status.displacement;
-    state_msg.state.distance_traveled = vesc_status.distance_traveled;
-    state_msg.state.fault_code = vesc_status.fault_code;
-
-    state_pub_->publish(state_msg);
+            state_pub_->publish(state_msg);
+        }
+    }
 }
 
 VescDriver::CommandLimit VescDriver::createCommandLimit(const std::string& name,

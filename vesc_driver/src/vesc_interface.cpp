@@ -37,6 +37,9 @@
 
 #include "vesc_msgs/msg/vesc_state.hpp"
 
+#include <chrono>
+using namespace std::chrono_literals;
+
 namespace vesc_driver {
 
 VescInterface::VescInterface(const ErrorHandlerFunction& error_handler, uint32_t state_request_millis)
@@ -280,11 +283,13 @@ void VescInterface::get_status(VescStatusStruct* status) {
     *status = status_;
 }
 
-void VescInterface::wait_for_status(VescStatusStruct* status) {
+bool VescInterface::wait_for_status(VescStatusStruct* status) {
     std::unique_lock<std::mutex> lk(status_mutex_);
     // wait for new data
-    status_cv_.wait(lk);
+    // timeout is needed in order to prevent blocking SIGINT
+    bool status_ready = !static_cast<bool>(status_cv_.wait_for(lk, 100ms));
     *status = status_;
+    return status_ready;
 }
 
 } // namespace vesc_driver

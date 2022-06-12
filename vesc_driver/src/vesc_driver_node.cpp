@@ -39,14 +39,13 @@
 #include <memory.h>
 
 int main(int argc, char** argv) {
-    // TODO: split publisher and subscribers into separate components and use MultiThreadedExecutor instead of polling
-
     rclcpp::init(argc, argv);
-    vesc_driver::VescDriver::SharedPtr vesc_driver = std::make_shared<vesc_driver::VescDriver>(rclcpp::NodeOptions());
+
+    std::shared_ptr<vesc_driver::VescDriver> vesc_driver =
+        std::make_shared<vesc_driver::VescDriver>(rclcpp::NodeOptions());
     rclcpp::spin(vesc_driver);
 
-    vesc_driver.stop();
-
+    vesc_driver->stop();
     rclcpp::shutdown();
 
     return 0;
