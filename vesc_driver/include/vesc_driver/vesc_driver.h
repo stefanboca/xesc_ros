@@ -52,6 +52,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -76,6 +77,7 @@ private:
         std::optional<double> upper;
 
         double clip(double value);
+        rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter>& parameters);
     };
     CommandLimit duty_cycle_limit_;
     CommandLimit current_limit_;
@@ -100,7 +102,10 @@ private:
     void brakeCallback(const std_msgs::msg::Float64::SharedPtr brake);
     void speedCallback(const std_msgs::msg::Float64::SharedPtr speed);
     void positionCallback(const std_msgs::msg::Float64::SharedPtr position);
+    rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter>& parameters);
     void publishThread();
+
+    OnSetParametersCallbackHandle::SharedPtr parametersCallbackHandle;
 
 protected:
     CommandLimit createCommandLimit(const std::string& name,

@@ -45,12 +45,13 @@ VescDriver::VescDriver(rclcpp::NodeOptions options)
       vesc_(std::bind(&VescDriver::vescErrorCallback, this, std::placeholders::_1)) {
     this->declare_parameter("port", rclcpp::PARAMETER_STRING);
 
-    // TODO: handle parameter changes during runtime
     duty_cycle_limit_ = createCommandLimit("duty_cycle", -1.0, 1.0);
     current_limit_ = createCommandLimit("current");
     brake_limit_ = createCommandLimit("brake");
     speed_limit_ = createCommandLimit("speed");
     position_limit_ = createCommandLimit("position");
+
+    parametersCallbackHandle = add_on_set_parameters_callback(std::bind(&VescDriver::parametersCallback, this, _1));
 
     // get vesc serial port address
     std::string port;
@@ -134,6 +135,20 @@ void VescDriver::positionCallback(const std_msgs::msg::Float64::SharedPtr positi
     // ROS uses radians but VESC seems to use degrees. Convert to degrees.
     double position_deg = position_limit_.clip(position->data) * 180.0 / M_PI;
     vesc_.setPosition(position_deg);
+}
+
+rcl_interfaces::msg::SetParametersResult
+VescDriver::parametersCallback(const std::vector<rclcpp::Parameter>& parameters) {
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    for (const auto& parameter : parameters) {
+        const std::string& name = parameter.get_name();
+        if (name == "port") {
+            result.successful = false;
+            result.reason = "cannot change port during runtime";
+        }
+    }
+    return result;
 }
 
 void VescDriver::publishThread() {
@@ -238,28 +253,30 @@ VescDriver::CommandLimit VescDriver::createCommandLimit(const std::string& name,
 }
 
 double VescDriver::CommandLimit::clip(double value) {
-    // auto& clk = *node->get_clock();
-    if (lower && value < lower) {
-        // RCLCPP_INFO_THROTTLE(node->get_logger(),
-        //                      clk,
-        //                      10000,
-        //                      "%s command value (%f) below minimum limit (%f), clipping.",
-        //                      name.c_str(),
-        //                      value,
-        //                      *lower);
-        return *lower;
-    }
-    if (upper && value > upper) {
-        // RCLCPP_INFO_THROTTLE(node->get_logger(),
-        //                      clk,
-        //                      10000,
-        //                      "%s command value (%f) above maximum limit (%f), clipping.",
-        //                      name.c_str(),
-        //                      value,
-        //                      *upper);
-        return *upper;
-    }
+    if (lower && value < lower) { return *lower; }
+    if (upper && value > upper) { return *upper; }
     return value;
+}
+
+rcl_interfaces::msg::SetParametersResult
+VescDriver::CommandLimit::parametersCallback(const std::vector<rclcpp::Parameter>& parameters) {
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    for (const auto& parameter : parameters) {
+        const std::string& param_name = parameter.get_name();
+        if (param_name == name + "_min") {
+            double v = parameter.get_value<double>();
+        } else if (param_name == name + "_max") {
+            double v = parameter.get_value<double>();
+        }
+
+        if (upper && lower && *lower > *upper) {
+            double temp = *lower;
+            lower = *upper;
+            upper = temp;
+        }
+    }
+    return result;
 }
 
 } // namespace vesc_driver
